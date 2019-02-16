@@ -1,5 +1,5 @@
 //=============================================================================
-// Copyright (c) 2001-2018 FLIR Systems, Inc. All Rights Reserved.
+// Copyright © 2018 FLIR Integrated Imaging Solutions, Inc. All Rights Reserved.
 //
 // This software is the confidential and proprietary information of FLIR
 // Integrated Imaging Solutions, Inc. ("Confidential Information"). You
@@ -18,23 +18,23 @@
 /**
  *  @example Acquisition.cpp
  *
- *  @brief Acquisition.cpp shows how to acquire images. It relies on
+ *  @brief Acquisition.cpp shows how to acquire images. It relies on 
  *  information provided in the Enumeration example. Also, check out the
- *  ExceptionHandling and NodeMapInfo examples if you haven't already.
+ *  ExceptionHandling and NodeMapInfo examples if you haven't already. 
  *  ExceptionHandling shows the handling of standard and Spinnaker exceptions
- *  while NodeMapInfo explores retrieving information from various node types.
+ *  while NodeMapInfo explores retrieving information from various node types.  
  *
  *  This example touches on the preparation and cleanup of a camera just before
  *  and just after the acquisition of images. Image retrieval and conversion,
  *  grabbing image data, and saving images are all covered as well.
  *
- *  Once comfortable with Acquisition, we suggest checking out
- *  AcquisitionMultipleCamera, NodeMapCallback, or SaveToAvi.
- *  AcquisitionMultipleCamera demonstrates simultaneously acquiring images from
- *  a number of cameras, NodeMapCallback serves as a good introduction to
+ *  Once comfortable with Acquisition, we suggest checking out 
+ *  AcquisitionMultipleCamera, NodeMapCallback, or SaveToAvi. 
+ *  AcquisitionMultipleCamera demonstrates simultaneously acquiring images from 
+ *  a number of cameras, NodeMapCallback serves as a good introduction to 
  *  programming with callbacks and events, and SaveToAvi exhibits video creation.
  */
-
+ 
 #include "Spinnaker.h"
 #include "SpinGenApi/SpinnakerGenApi.h"
 #include <iostream>
@@ -79,16 +79,14 @@ int DisableHeartbeat(CameraPtr pCam, INodeMap & nodeMap, INodeMap & nodeMapTLDev
         {
             cout << "Working with a GigE camera. Attempting to disable heartbeat before continuing..." << endl << endl;
             CBooleanPtr ptrDeviceHeartbeat = nodeMap.GetNode("GevGVCPHeartbeatDisable");
-            if (!IsAvailable(ptrDeviceHeartbeat) || !IsWritable(ptrDeviceHeartbeat))
+            if ( !IsAvailable(ptrDeviceHeartbeat) || !IsWritable(ptrDeviceHeartbeat) )
             {
-                cout << "Unable to disable heartbeat on camera. Continuing with execution as this may be non-fatal..." << endl << endl;
+                cout << "Unable to disable heartbeat on camera. Aborting..." << endl << endl;
+                return -1;
             }
-            else
-            {
-                ptrDeviceHeartbeat->SetValue(true);
-                cout << "WARNING: Heartbeat on GigE camera disabled for the rest of Debug Mode." << endl;
-                cout << "         Power cycle camera when done debugging to re-enable the heartbeat..." << endl << endl;
-            }
+            ptrDeviceHeartbeat->SetValue(true);
+            cout << "WARNING: Heartbeat on GigE camera disabled for the rest of Debug Mode." << endl;
+            cout << "         Power cycle camera when done debugging to re-enable the heartbeat..." << endl << endl;
         }
         else
         {
@@ -103,9 +101,9 @@ int DisableHeartbeat(CameraPtr pCam, INodeMap & nodeMap, INodeMap & nodeMapTLDev
 int AcquireImages(CameraPtr pCam, INodeMap & nodeMap, INodeMap & nodeMapTLDevice)
 {
     int result = 0;
-
+    
     cout << endl << endl << "*** IMAGE ACQUISITION ***" << endl << endl;
-
+    
     try
     {
         //
@@ -137,7 +135,7 @@ int AcquireImages(CameraPtr pCam, INodeMap & nodeMap, INodeMap & nodeMapTLDevice
             cout << "Unable to set acquisition mode to continuous (enum retrieval). Aborting..." << endl << endl;
             return -1;
         }
-
+        
         // Retrieve entry node from enumeration node
         CEnumEntryPtr ptrAcquisitionModeContinuous = ptrAcquisitionMode->GetEntryByName("Continuous");
         if (!IsAvailable(ptrAcquisitionModeContinuous) || !IsReadable(ptrAcquisitionModeContinuous))
@@ -145,24 +143,22 @@ int AcquireImages(CameraPtr pCam, INodeMap & nodeMap, INodeMap & nodeMapTLDevice
             cout << "Unable to set acquisition mode to continuous (entry retrieval). Aborting..." << endl << endl;
             return -1;
         }
-
+        
         // Retrieve integer value from entry node
         int64_t acquisitionModeContinuous = ptrAcquisitionModeContinuous->GetValue();
-
+        
         // Set integer value from entry node as new value of enumeration node
         ptrAcquisitionMode->SetIntValue(acquisitionModeContinuous);
-
+        
         cout << "Acquisition mode set to continuous..." << endl;
 
 #ifdef _DEBUG
         cout << endl << endl << "*** DEBUG ***" << endl << endl;
-
         // If using a GEV camera and debugging, should disable heartbeat first to prevent further issues
         if (DisableHeartbeat(pCam, nodeMap, nodeMapTLDevice) != 0)
         {
             return -1;
         }
-
         cout << endl << endl << "*** END OF DEBUG ***" << endl << endl;
 #endif
 
@@ -172,7 +168,7 @@ int AcquireImages(CameraPtr pCam, INodeMap & nodeMap, INodeMap & nodeMapTLDevice
         // *** NOTES ***
         // What happens when the camera begins acquiring images depends on the
         // acquisition mode. Single frame captures only a single image, multi 
-        // frame captures a set number of images, and continuous captures a 
+        // frame catures a set number of images, and continuous captures a 
         // continuous stream of images. Because the example calls for the 
         // retrieval of 10 images, continuous mode has been set.
         // 
@@ -182,7 +178,7 @@ int AcquireImages(CameraPtr pCam, INodeMap & nodeMap, INodeMap & nodeMapTLDevice
         pCam->BeginAcquisition();
 
         cout << "Acquiring images..." << endl;
-
+        
         //
         // Retrieve device serial number for filename
         //
@@ -200,10 +196,10 @@ int AcquireImages(CameraPtr pCam, INodeMap & nodeMap, INodeMap & nodeMapTLDevice
             cout << "Device serial number retrieved as " << deviceSerialNumber << "..." << endl;
         }
         cout << endl;
-
+        
         // Retrieve, convert, and save images
         const unsigned int k_numImages = 10;
-
+        
         for (unsigned int imageCnt = 0; imageCnt < k_numImages; imageCnt++)
         {
             try
@@ -234,8 +230,8 @@ int AcquireImages(CameraPtr pCam, INodeMap & nodeMap, INodeMap & nodeMapTLDevice
                 if (pResultImage->IsIncomplete())
                 {
                     // Retreive and print the image status description
-                    cout << "Image incomplete: "
-                        << Image::GetImageStatusDescription(pResultImage->GetImageStatus())
+                    cout << "Image incomplete: " 
+                        << Image::GetImageStatusDescription(pResultImage->GetImageStatus()) 
                         << "..." << endl << endl;
                 }
                 else
@@ -249,9 +245,9 @@ int AcquireImages(CameraPtr pCam, INodeMap & nodeMap, INodeMap & nodeMapTLDevice
                     // name a few.
                     //
                     size_t width = pResultImage->GetWidth();
-
+                    
                     size_t height = pResultImage->GetHeight();
-
+                    
                     cout << "Grabbed image " << imageCnt << ", width = " << width << ", height = " << height << endl;
 
                     //
@@ -270,11 +266,11 @@ int AcquireImages(CameraPtr pCam, INodeMap & nodeMap, INodeMap & nodeMapTLDevice
 
                     // Create a unique filename
                     ostringstream filename;
-
+                    
                     filename << "Acquisition-";
                     if (deviceSerialNumber != "")
                     {
-                        filename << deviceSerialNumber.c_str() << "-";
+                            filename << deviceSerialNumber.c_str() << "-";
                     }
                     filename << imageCnt << ".jpg";
 
@@ -317,7 +313,7 @@ int AcquireImages(CameraPtr pCam, INodeMap & nodeMap, INodeMap & nodeMapTLDevice
         // Ending acquisition appropriately helps ensure that devices clean up
         // properly and do not need to be power-cycled to maintain integrity.
         //
-
+        
         pCam->EndAcquisition();
 
 
@@ -327,7 +323,7 @@ int AcquireImages(CameraPtr pCam, INodeMap & nodeMap, INodeMap & nodeMapTLDevice
         cout << "Error: " << e.what() << endl;
         result = -1;
     }
-
+    
     return result;
 }
 
@@ -337,7 +333,7 @@ int AcquireImages(CameraPtr pCam, INodeMap & nodeMap, INodeMap & nodeMapTLDevice
 int PrintDeviceInfo(INodeMap & nodeMap)
 {
     int result = 0;
-
+    
     cout << endl << "*** DEVICE INFORMATION ***" << endl << endl;
 
     try
@@ -368,7 +364,7 @@ int PrintDeviceInfo(INodeMap & nodeMap)
         cout << "Error: " << e.what() << endl;
         result = -1;
     }
-
+    
     return result;
 }
 
@@ -382,18 +378,18 @@ int RunSingleCamera(CameraPtr pCam)
     {
         // Retrieve TL device nodemap and print device information
         INodeMap & nodeMapTLDevice = pCam->GetTLDeviceNodeMap();
-
+        
         result = PrintDeviceInfo(nodeMapTLDevice);
-
+        
         // Initialize camera
         pCam->Init();
-
+        
         // Retrieve GenICam nodemap
         INodeMap & nodeMap = pCam->GetNodeMap();
 
         // Acquire images
         result = result | AcquireImages(pCam, nodeMap, nodeMapTLDevice);
-
+        
         // Deinitialize camera
         pCam->DeInit();
     }
@@ -414,7 +410,7 @@ int main(int /*argc*/, char** /*argv*/)
     // we must ensure that we have permission to write to this folder.
     // If we do not have permission, fail right away.
     FILE *tempFile = fopen("test.txt", "w+");
-    if (tempFile == nullptr)
+    if (tempFile == NULL)
     {
         cout << "Failed to create file in current folder.  Please check "
             "permissions."
@@ -427,14 +423,14 @@ int main(int /*argc*/, char** /*argv*/)
     remove("test.txt");
 
     int result = 0;
-
+    
     // Print application build information
     cout << "Application build date: " << __DATE__ << " " << __TIME__ << endl << endl;
-
+    
     // Retrieve singleton reference to system object
     SystemPtr system = System::GetInstance();
 
-    // Print out current library version
+    // Print Spinnaker library version
     const LibraryVersion spinnakerLibraryVersion = system->GetLibraryVersion();
     cout << "Spinnaker library version: "
         << spinnakerLibraryVersion.major << "."
@@ -446,9 +442,9 @@ int main(int /*argc*/, char** /*argv*/)
     CameraList camList = system->GetCameras();
 
     unsigned int numCameras = camList.GetSize();
-
+    
     cout << "Number of cameras detected: " << numCameras << endl << endl;
-
+    
     // Finish if there are no cameras
     if (numCameras == 0)
     {
@@ -461,7 +457,7 @@ int main(int /*argc*/, char** /*argv*/)
         cout << "Not enough cameras!" << endl;
         cout << "Done! Press Enter to exit..." << endl;
         getchar();
-
+        
         return -1;
     }
 
@@ -475,10 +471,10 @@ int main(int /*argc*/, char** /*argv*/)
     // the reference to the shared point must be broken manually.
     //
     // *** LATER ***
-    // Shared pointers can be terminated manually by assigning them to nullptr.
+    // Shared pointers can be terminated manually by assigning them to NULL.
     // This keeps releasing the system from throwing an exception.
     //
-    CameraPtr pCam = nullptr;
+    CameraPtr pCam = NULL;
 
     // Run example on each camera
     for (unsigned int i = 0; i < numCameras; i++)
@@ -487,10 +483,10 @@ int main(int /*argc*/, char** /*argv*/)
         pCam = camList.GetByIndex(i);
 
         cout << endl << "Running example for camera " << i << "..." << endl;
-
+        
         // Run example
         result = result | RunSingleCamera(pCam);
-
+        
         cout << "Camera " << i << " example complete..." << endl << endl;
     }
 
@@ -502,7 +498,7 @@ int main(int /*argc*/, char** /*argv*/)
     // be necessary to manually break the reference because the shared pointer
     // would have automatically cleaned itself up upon exiting the loop.
     //
-    pCam = nullptr;
+    pCam = NULL;
 
     // Clear camera list before releasing system
     camList.Clear();
