@@ -1,1 +1,13 @@
-# 这是使用Spinnaker SDK从FLIR Grasshopper系列相机获取图像的例程
+# Using Spinnaker SDK to acquire images and converts them into cv::Mat
+
+## How to run under Linux
+```
+mkdir build
+cd build
+cmake ..
+make
+./Acquisition
+```
+
+## TODOS
+- can't show RGB format images(guessing that there's something to do with Nodemap)
