@@ -38,7 +38,9 @@
 #include "Spinnaker.h"
 #include "SpinGenApi/SpinnakerGenApi.h"
 #include <iostream>
-#include <sstream> 
+#include <sstream>
+#include <opencv2/highgui/highgui.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
 
 using namespace Spinnaker;
 using namespace Spinnaker::GenApi;
@@ -46,7 +48,7 @@ using namespace Spinnaker::GenICam;
 using namespace std;
 
 #ifdef _DEBUG
-// Disables heartbeat on GEV cameras so debugging does not incur timeout errors
+// Disables heartbeat on GEV cameras(GigE Vison) so debugging does not incur timeout errors
 int DisableHeartbeat(CameraPtr pCam, INodeMap & nodeMap, INodeMap & nodeMapTLDevice)
 {
     cout << "Checking device type to see if we need to disable the camera's heartbeat..." << endl << endl;
@@ -97,7 +99,22 @@ int DisableHeartbeat(CameraPtr pCam, INodeMap & nodeMap, INodeMap & nodeMapTLDev
 }
 #endif
 
-// This function acquires and saves 10 images from a device.  
+/*
+ * This function shows how to convert between Spinnaker ImagePtr container to CVmat container used in OpenCV.
+*/
+cv::Mat ConvertToCVmat(ImagePtr pImage)
+{
+    ImagePtr convertedImage = pImage->Convert(PixelFormat_Mono8, NEAREST_NEIGHBOR);
+
+    unsigned int XPadding = convertedImage->GetXPadding();
+    unsigned int YPadding = convertedImage->GetYPadding();
+    unsigned int rowsize = convertedImage->GetWidth();
+    unsigned int colsize = convertedImage->GetHeight();
+    //image data contains padding. When allocating Mat container size, you need to account for the X,Y image data padding.
+    cv::Mat cvimg = cv::Mat(colsize + YPadding, rowsize + XPadding, CV_8UC1, convertedImage->GetData(), convertedImage->GetStride());
+    return cvimg;
+}
+// This function acquires images from a device.
 int AcquireImages(CameraPtr pCam, INodeMap & nodeMap, INodeMap & nodeMapTLDevice)
 {
     int result = 0;
@@ -196,15 +213,14 @@ int AcquireImages(CameraPtr pCam, INodeMap & nodeMap, INodeMap & nodeMapTLDevice
             cout << "Device serial number retrieved as " << deviceSerialNumber << "..." << endl;
         }
         cout << endl;
-        
-        // Retrieve, convert, and save images
-        const unsigned int k_numImages = 10;
-        
-        for (unsigned int imageCnt = 0; imageCnt < k_numImages; imageCnt++)
+
+        // Retrieve, convert, and show images
+
+        try
         {
-            try
+
+            while(true)
             {
-                //
                 // Retrieve next received image
                 //
                 // *** NOTES ***
@@ -212,8 +228,8 @@ int AcquireImages(CameraPtr pCam, INodeMap & nodeMap, INodeMap & nodeMapTLDevice
                 // to capture an image that does not exist will hang the camera.
                 //
                 // *** LATER ***
-                // Once an image from the buffer is saved and/or no longer 
-                // needed, the image must be released in order to keep the 
+                // Once an image from the buffer is saved and/or no longer
+                // needed, the image must be released in order to keep the
                 // buffer from filling up.
                 //
                 ImagePtr pResultImage = pCam->GetNextImage();
@@ -230,9 +246,9 @@ int AcquireImages(CameraPtr pCam, INodeMap & nodeMap, INodeMap & nodeMapTLDevice
                 if (pResultImage->IsIncomplete())
                 {
                     // Retreive and print the image status description
-                    cout << "Image incomplete: " 
-                        << Image::GetImageStatusDescription(pResultImage->GetImageStatus()) 
-                        << "..." << endl << endl;
+                    cout << "Image incomplete: "
+                         << Image::GetImageStatusDescription(pResultImage->GetImageStatus())
+                         << "..." << endl << endl;
                 }
                 else
                 {
@@ -245,49 +261,22 @@ int AcquireImages(CameraPtr pCam, INodeMap & nodeMap, INodeMap & nodeMapTLDevice
                     // name a few.
                     //
                     size_t width = pResultImage->GetWidth();
-                    
+
                     size_t height = pResultImage->GetHeight();
-                    
-                    cout << "Grabbed image " << imageCnt << ", width = " << width << ", height = " << height << endl;
 
-                    //
-                    // Convert image to mono 8
-                    //
-                    // *** NOTES ***
-                    // Images can be converted between pixel formats by using 
-                    // the appropriate enumeration value. Unlike the original 
-                    // image, the converted one does not need to be released as 
-                    // it does not affect the camera buffer.
-                    //
-                    // When converting images, color processing algorithm is an
-                    // optional parameter.
-                    // 
-                    ImagePtr convertedImage = pResultImage->Convert(PixelFormat_Mono8, HQ_LINEAR);
+                    cout << "Grabbed image " << " width = " << width << ", height = " << height << endl;
+                    cv::Mat cvImage = ConvertToCVmat(pResultImage);
+                    cv::namedWindow("Acquisition", CV_WINDOW_FULLSCREEN);
+                    //cv::imwrite("0.jpg", cvImage);
+                    cv::imshow("Acquisition", cvImage);
+                    if(!cvImage.data){cout<<"meiyoushujv"<<endl;}
+                    cout<<cvImage.rows<<" dsaf "<<cvImage.cols<<cvImage.channels()<<endl;
+                    int key = cv::waitKey(1);
+                    if ( key == 27) // press "Esc" to stop
+                    {break;}
 
-                    // Create a unique filename
-                    ostringstream filename;
-                    
-                    filename << "Acquisition-";
-                    if (deviceSerialNumber != "")
-                    {
-                            filename << deviceSerialNumber.c_str() << "-";
-                    }
-                    filename << imageCnt << ".jpg";
-
-                    //
-                    // Save image
-                    // 
-                    // *** NOTES ***
-                    // The standard practice of the examples is to use device
-                    // serial numbers to keep images of one device from 
-                    // overwriting those of another.
-                    //
-                    convertedImage->Save(filename.str().c_str());
-
-                    cout << "Image saved at " << filename.str() << endl;
                 }
 
-                //
                 // Release image
                 //
                 // *** NOTES ***
@@ -296,14 +285,15 @@ int AcquireImages(CameraPtr pCam, INodeMap & nodeMap, INodeMap & nodeMapTLDevice
                 // buffer.
                 //
                 pResultImage->Release();
+            }
 
-                cout << endl;
-            }
-            catch (Spinnaker::Exception &e)
-            {
-                cout << "Error: " << e.what() << endl;
-                result = -1;
-            }
+
+            cout << endl;
+        }
+        catch (Spinnaker::Exception &e)
+        {
+            cout << "Error: " << e.what() << endl;
+            result = -1;
         }
 
         //
@@ -315,8 +305,6 @@ int AcquireImages(CameraPtr pCam, INodeMap & nodeMap, INodeMap & nodeMapTLDevice
         //
         
         pCam->EndAcquisition();
-
-
     }
     catch (Spinnaker::Exception &e)
     {
@@ -378,15 +366,14 @@ int RunSingleCamera(CameraPtr pCam)
     {
         // Retrieve TL device nodemap and print device information
         INodeMap & nodeMapTLDevice = pCam->GetTLDeviceNodeMap();
-        
+
         result = PrintDeviceInfo(nodeMapTLDevice);
-        
+
         // Initialize camera
         pCam->Init();
         
         // Retrieve GenICam nodemap
         INodeMap & nodeMap = pCam->GetNodeMap();
-
         // Acquire images
         result = result | AcquireImages(pCam, nodeMap, nodeMapTLDevice);
         
@@ -505,9 +492,7 @@ int main(int /*argc*/, char** /*argv*/)
 
     // Release system
     system->ReleaseInstance();
-
     cout << endl << "Done! Press Enter to exit..." << endl;
     getchar();
-
     return result;
 }
