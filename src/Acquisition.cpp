@@ -102,16 +102,14 @@ int DisableHeartbeat(CameraPtr pCam, INodeMap & nodeMap, INodeMap & nodeMapTLDev
 /*
  * This function shows how to convert between Spinnaker ImagePtr container to CVmat container used in OpenCV.
 */
-cv::Mat ConvertToCVmat(ImagePtr pImage)
+cv::Mat ConvertToCVmat(ImagePtr spinImage)
 {
-    ImagePtr convertedImage = pImage->Convert(PixelFormat_Mono8, NEAREST_NEIGHBOR);
-
-    unsigned int XPadding = convertedImage->GetXPadding();
-    unsigned int YPadding = convertedImage->GetYPadding();
-    unsigned int rowsize = convertedImage->GetWidth();
-    unsigned int colsize = convertedImage->GetHeight();
+    unsigned int XPadding = spinImage->GetXPadding();
+    unsigned int YPadding = spinImage->GetYPadding();
+    unsigned int rowsize = spinImage->GetWidth();
+    unsigned int colsize = spinImage->GetHeight();
     //image data contains padding. When allocating Mat container size, you need to account for the X,Y image data padding.
-    cv::Mat cvimg = cv::Mat(colsize + YPadding, rowsize + XPadding, CV_8UC1, convertedImage->GetData(), convertedImage->GetStride());
+    cv::Mat cvimg = cv::Mat(colsize + YPadding, rowsize + XPadding, CV_8UC3, spinImage->GetData(), spinImage->GetStride());
     return cvimg;
 }
 // This function acquires images from a device.
@@ -168,6 +166,22 @@ int AcquireImages(CameraPtr pCam, INodeMap & nodeMap, INodeMap & nodeMapTLDevice
         ptrAcquisitionMode->SetIntValue(acquisitionModeContinuous);
         
         cout << "Acquisition mode set to continuous..." << endl;
+
+        // Set pixel format to RGB8
+        CEnumerationPtr ptrPixelFormat = nodeMap.GetNode("PixelFormat");
+        if (!IsAvailable(ptrPixelFormat) || !IsWritable(ptrPixelFormat))
+        {
+            cout<< "Unable to set Pixel Format to RGB8(enum retrieval). Aborting"<<endl;
+            return -1;
+        }
+        CEnumEntryPtr ptrPixelFormat_RGB8 = ptrPixelFormat->GetEntryByName("RGB8");
+        if ((!IsAvailable(ptrPixelFormat_RGB8)) || !IsReadable(ptrPixelFormat_RGB8))
+        {
+            cout<< "Unable to set Pixel Format to RGB8(entry retrieval). Aborting"<<endl;
+            return -1;
+        }
+        int64_t pixelFormatRGB8 = ptrPixelFormat_RGB8->GetValue();
+        ptrPixelFormat->SetIntValue(pixelFormatRGB8);
 
 #ifdef _DEBUG
         cout << endl << endl << "*** DEBUG ***" << endl << endl;
@@ -263,14 +277,15 @@ int AcquireImages(CameraPtr pCam, INodeMap & nodeMap, INodeMap & nodeMapTLDevice
                     size_t width = pResultImage->GetWidth();
 
                     size_t height = pResultImage->GetHeight();
-
-                    cout << "Grabbed image " << " width = " << width << ", height = " << height << endl;
+                    size_t channel = pResultImage->GetNumChannels();
+                    cout << "Grabbed image " << "width = " << width << ", height = " << height <<", channels: "<<channel<< endl;
                     cv::Mat cvImage = ConvertToCVmat(pResultImage);
-                    cv::namedWindow("Acquisition", CV_WINDOW_FULLSCREEN);
-                    //cv::imwrite("0.jpg", cvImage);
+                    //
+                    // original image is in RGB format, needs to be converted into BGR(OpenCV uses BGR)
+                    //
+                    cv::cvtColor(cvImage, cvImage, CV_BGR2RGB);
+                    cv::namedWindow("Acquisition", CV_WINDOW_FREERATIO);
                     cv::imshow("Acquisition", cvImage);
-                    if(!cvImage.data){cout<<"meiyoushujv"<<endl;}
-                    cout<<cvImage.rows<<" dsaf "<<cvImage.cols<<cvImage.channels()<<endl;
                     int key = cv::waitKey(1);
                     if ( key == 27) // press "Esc" to stop
                     {break;}
