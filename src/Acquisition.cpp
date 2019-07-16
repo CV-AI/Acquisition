@@ -113,11 +113,75 @@ cv::Mat ConvertToCVmat(ImagePtr spinImage)
     return cvimg;
 }
 // This function acquires images from a device.
-int AcquireImages(CameraPtr pCam, INodeMap & nodeMap, INodeMap & nodeMapTLDevice)
+cv::Mat AcquireImages(CameraPtr  pCam)
+{
+    
+    cv::Mat cvImage;
+    // Retrieve, convert, and show images
+
+    try
+    {
+
+        // Retrieve next received image
+        //
+        // *** NOTES ***
+        // Capturing an image houses images on the camera buffer. Trying
+        // to capture an image that does not exist will hang the camera.
+        //
+        // *** LATER ***
+        // Once an image from the buffer is saved and/or no longer
+        // needed, the image must be released in order to keep the
+        // buffer from filling up.
+        //
+        ImagePtr pResultImage = pCam->GetNextImage();
+
+        //
+        // Ensure image completion
+        //
+        if (pResultImage->IsIncomplete())
+        {
+            // Retreive and print the image status description
+            std::cout << "Image incomplete: "
+                    << Image::GetImageStatusDescription(pResultImage->GetImageStatus())
+                    << "..." << endl << endl;
+        }
+        else
+        {
+            // Print image information; height and width recorded in pixels
+            cvImage = ConvertToCVmat(pResultImage);
+            // original image is in RGB format, needs to be converted into BGR(OpenCV uses BGR)
+            cv::cvtColor(cvImage, cvImage, CV_BGR2RGB);
+        }
+
+        // Release image
+        //
+        // *** NOTES ***
+        // Images retrieved directly from the camera (i.e. non-converted
+        // images) need to be released in order to keep from filling the
+        // buffer.
+        //
+        pResultImage->Release();
+    }
+    catch (Spinnaker::Exception &e)
+    {
+        std::cout << "Error during acquiring images: " << e.what() << endl;
+    }
+
+    //
+    // End acquisition
+    //
+    // *** NOTES ***
+    // Ending acquisition appropriately helps ensure that devices clean up
+    // properly and do not need to be power-cycled to maintain integrity.
+    //
+    return cvImage;
+}
+// This function config the camera settings
+int ConfigCamera(CameraPtr pCam, INodeMap & nodeMap, INodeMap & nodeMapTLDevice)
 {
     int result = 0;
     
-    cout << endl << endl << "*** IMAGE ACQUISITION ***" << endl << endl;
+    std::cout << endl << endl << "*** IMAGE ACQUISITION ***" << endl << endl;
     
     try
     {
@@ -147,7 +211,7 @@ int AcquireImages(CameraPtr pCam, INodeMap & nodeMap, INodeMap & nodeMapTLDevice
         CEnumerationPtr ptrAcquisitionMode = nodeMap.GetNode("AcquisitionMode");
         if (!IsAvailable(ptrAcquisitionMode) || !IsWritable(ptrAcquisitionMode))
         {
-            cout << "Unable to set acquisition mode to continuous (enum retrieval). Aborting..." << endl << endl;
+            std::cout << "Unable to set acquisition mode to continuous (enum retrieval). Aborting..." << endl << endl;
             return -1;
         }
         
@@ -155,7 +219,7 @@ int AcquireImages(CameraPtr pCam, INodeMap & nodeMap, INodeMap & nodeMapTLDevice
         CEnumEntryPtr ptrAcquisitionModeContinuous = ptrAcquisitionMode->GetEntryByName("Continuous");
         if (!IsAvailable(ptrAcquisitionModeContinuous) || !IsReadable(ptrAcquisitionModeContinuous))
         {
-            cout << "Unable to set acquisition mode to continuous (entry retrieval). Aborting..." << endl << endl;
+            std::cout << "Unable to set acquisition mode to continuous (entry retrieval). Aborting..." << endl << endl;
             return -1;
         }
         
@@ -165,19 +229,19 @@ int AcquireImages(CameraPtr pCam, INodeMap & nodeMap, INodeMap & nodeMapTLDevice
         // Set integer value from entry node as new value of enumeration node
         ptrAcquisitionMode->SetIntValue(acquisitionModeContinuous);
         
-        cout << "Acquisition mode set to continuous..." << endl;
+        std::cout << "Acquisition mode set to continuous..." << endl;
 
         // Set pixel format to RGB8
         CEnumerationPtr ptrPixelFormat = nodeMap.GetNode("PixelFormat");
         if (!IsAvailable(ptrPixelFormat) || !IsWritable(ptrPixelFormat))
         {
-            cout<< "Unable to set Pixel Format to RGB8(enum retrieval). Aborting"<<endl;
+            std::cout<< "Unable to set Pixel Format to RGB8(enum retrieval). Aborting"<<endl;
             return -1;
         }
         CEnumEntryPtr ptrPixelFormat_RGB8 = ptrPixelFormat->GetEntryByName("RGB8");
         if ((!IsAvailable(ptrPixelFormat_RGB8)) || !IsReadable(ptrPixelFormat_RGB8))
         {
-            cout<< "Unable to set Pixel Format to RGB8(entry retrieval). Aborting"<<endl;
+            std::cout<< "Unable to set Pixel Format to RGB8(entry retrieval). Aborting"<<endl;
             return -1;
         }
         int64_t pixelFormatRGB8 = ptrPixelFormat_RGB8->GetValue();
@@ -206,9 +270,9 @@ int AcquireImages(CameraPtr pCam, INodeMap & nodeMap, INodeMap & nodeMapTLDevice
         // *** LATER ***
         // Image acquisition must be ended when no more images are needed.
         //
-        pCam->BeginAcquisition();
+        // pCam->BeginAcquisition();
 
-        cout << "Acquiring images..." << endl;
+        std::cout << "Configing Camera..." << endl;
         
         //
         // Retrieve device serial number for filename
@@ -224,112 +288,18 @@ int AcquireImages(CameraPtr pCam, INodeMap & nodeMap, INodeMap & nodeMapTLDevice
         {
             deviceSerialNumber = ptrStringSerial->GetValue();
 
-            cout << "Device serial number retrieved as " << deviceSerialNumber << "..." << endl;
+            std::cout << "Device serial number retrieved as " << deviceSerialNumber << "..." << endl;
         }
-        cout << endl;
+        std::cout << endl;
 
-        // Retrieve, convert, and show images
-
-        try
-        {
-
-            while(true)
-            {
-                // Retrieve next received image
-                //
-                // *** NOTES ***
-                // Capturing an image houses images on the camera buffer. Trying
-                // to capture an image that does not exist will hang the camera.
-                //
-                // *** LATER ***
-                // Once an image from the buffer is saved and/or no longer
-                // needed, the image must be released in order to keep the
-                // buffer from filling up.
-                //
-                ImagePtr pResultImage = pCam->GetNextImage();
-
-                //
-                // Ensure image completion
-                //
-                // *** NOTES ***
-                // Images can easily be checked for completion. This should be
-                // done whenever a complete image is expected or required.
-                // Further, check image status for a little more insight into
-                // why an image is incomplete.
-                //
-                if (pResultImage->IsIncomplete())
-                {
-                    // Retreive and print the image status description
-                    cout << "Image incomplete: "
-                         << Image::GetImageStatusDescription(pResultImage->GetImageStatus())
-                         << "..." << endl << endl;
-                }
-                else
-                {
-                    //
-                    // Print image information; height and width recorded in pixels
-                    //
-                    // *** NOTES ***
-                    // Images have quite a bit of available metadata including
-                    // things such as CRC, image status, and offset values, to
-                    // name a few.
-                    //
-                    size_t width = pResultImage->GetWidth();
-
-                    size_t height = pResultImage->GetHeight();
-                    size_t channel = pResultImage->GetNumChannels();
-                    cout << "Grabbed image " << "width = " << width << ", height = " << height <<", channels: "<<channel<< endl;
-                    cv::Mat cvImage = ConvertToCVmat(pResultImage);
-                    //
-                    // original image is in RGB format, needs to be converted into BGR(OpenCV uses BGR)
-                    //
-                    cv::cvtColor(cvImage, cvImage, CV_BGR2RGB);
-                    cv::namedWindow("Acquisition", CV_WINDOW_FREERATIO);
-                    cv::imshow("Acquisition", cvImage);
-                    int key = cv::waitKey(1);
-                    if ( key == 27) // press "Esc" to stop
-                    {break;}
-
-                }
-
-                // Release image
-                //
-                // *** NOTES ***
-                // Images retrieved directly from the camera (i.e. non-converted
-                // images) need to be released in order to keep from filling the
-                // buffer.
-                //
-                pResultImage->Release();
-            }
-
-
-            cout << endl;
-        }
-        catch (Spinnaker::Exception &e)
-        {
-            cout << "Error: " << e.what() << endl;
-            result = -1;
-        }
-
-        //
-        // End acquisition
-        //
-        // *** NOTES ***
-        // Ending acquisition appropriately helps ensure that devices clean up
-        // properly and do not need to be power-cycled to maintain integrity.
-        //
-        
-        pCam->EndAcquisition();
     }
     catch (Spinnaker::Exception &e)
     {
-        cout << "Error: " << e.what() << endl;
+        std::cout << "Error during config Camera: " << e.what() << endl;
         result = -1;
     }
-    
     return result;
 }
-
 // This function prints the device information of the camera from the transport
 // layer; please see NodeMapInfo example for more in-depth comments on printing
 // device information from the nodemap.
@@ -337,7 +307,7 @@ int PrintDeviceInfo(INodeMap & nodeMap)
 {
     int result = 0;
     
-    cout << endl << "*** DEVICE INFORMATION ***" << endl << endl;
+    std::cout << endl << "*** DEVICE INFORMATION ***" << endl << endl;
 
     try
     {
@@ -351,20 +321,20 @@ int PrintDeviceInfo(INodeMap & nodeMap)
             for (it = features.begin(); it != features.end(); ++it)
             {
                 CNodePtr pfeatureNode = *it;
-                cout << pfeatureNode->GetName() << " : ";
+                std::cout << pfeatureNode->GetName() << " : ";
                 CValuePtr pValue = (CValuePtr)pfeatureNode;
-                cout << (IsReadable(pValue) ? pValue->ToString() : "Node not readable");
-                cout << endl;
+                std::cout << (IsReadable(pValue) ? pValue->ToString() : "Node not readable");
+                std::cout << endl;
             }
         }
         else
         {
-            cout << "Device control information not available." << endl;
+            std::cout << "Device control information not available." << endl;
         }
     }
     catch (Spinnaker::Exception &e)
     {
-        cout << "Error: " << e.what() << endl;
+        std::cout << "Error: during print Device information" << e.what() << endl;
         result = -1;
     }
     
@@ -390,14 +360,26 @@ int RunSingleCamera(CameraPtr pCam)
         // Retrieve GenICam nodemap
         INodeMap & nodeMap = pCam->GetNodeMap();
         // Acquire images
-        result = result | AcquireImages(pCam, nodeMap, nodeMapTLDevice);
-        
+        ConfigCamera(pCam, nodeMap, nodeMapTLDevice);
+        pCam->BeginAcquisition();
+        cv::Mat image;
+        cv::namedWindow("Camera", 0);
+        while(true)
+        {
+            image = AcquireImages(pCam);
+            cv::imshow("Camera", image);
+            cv::waitKey(1);
+            int key = cv::waitKey(1);
+            if ( key == 27) // press "Esc" to stop
+            {break;}
+        } 
         // Deinitialize camera
+        pCam->EndAcquisition();
         pCam->DeInit();
     }
     catch (Spinnaker::Exception &e)
     {
-        cout << "Error: " << e.what() << endl;
+        std::cout << "Error during RunSingleCamera: " << e.what() << endl;
         result = -1;
     }
 
@@ -414,10 +396,10 @@ int main(int /*argc*/, char** /*argv*/)
     FILE *tempFile = fopen("test.txt", "w+");
     if (tempFile == NULL)
     {
-        cout << "Failed to create file in current folder.  Please check "
+        std::cout << "Failed to create file in current folder.  Please check "
             "permissions."
             << endl;
-        cout << "Press Enter to exit..." << endl;
+        std::cout << "Press Enter to exit..." << endl;
         getchar();
         return -1;
     }
@@ -427,14 +409,14 @@ int main(int /*argc*/, char** /*argv*/)
     int result = 0;
     
     // Print application build information
-    cout << "Application build date: " << __DATE__ << " " << __TIME__ << endl << endl;
+    std::cout << "Application build date: " << __DATE__ << " " << __TIME__ << endl << endl;
     
     // Retrieve singleton reference to system object
     SystemPtr system = System::GetInstance();
 
     // Print Spinnaker library version
     const LibraryVersion spinnakerLibraryVersion = system->GetLibraryVersion();
-    cout << "Spinnaker library version: "
+    std::cout << "Spinnaker library version: "
         << spinnakerLibraryVersion.major << "."
         << spinnakerLibraryVersion.minor << "."
         << spinnakerLibraryVersion.type << "."
@@ -445,7 +427,7 @@ int main(int /*argc*/, char** /*argv*/)
 
     unsigned int numCameras = camList.GetSize();
     
-    cout << "Number of cameras detected: " << numCameras << endl << endl;
+    std::cout << "Number of cameras detected: " << numCameras << endl << endl;
     
     // Finish if there are no cameras
     if (numCameras == 0)
@@ -456,8 +438,8 @@ int main(int /*argc*/, char** /*argv*/)
         // Release system
         system->ReleaseInstance();
 
-        cout << "Not enough cameras!" << endl;
-        cout << "Done! Press Enter to exit..." << endl;
+        std::cout << "Not enough cameras!" << endl;
+        std::cout << "Done! Press Enter to exit..." << endl;
         getchar();
         
         return -1;
@@ -484,12 +466,12 @@ int main(int /*argc*/, char** /*argv*/)
         // Select camera
         pCam = camList.GetByIndex(i);
 
-        cout << endl << "Running example for camera " << i << "..." << endl;
+        std::cout << endl << "Running example for camera " << i << "..." << endl;
         
         // Run example
         result = result | RunSingleCamera(pCam);
         
-        cout << "Camera " << i << " example complete..." << endl << endl;
+        std::cout << "Camera " << i << " example complete..." << endl << endl;
     }
 
     //
@@ -507,7 +489,7 @@ int main(int /*argc*/, char** /*argv*/)
 
     // Release system
     system->ReleaseInstance();
-    cout << endl << "Done! Press Enter to exit..." << endl;
+    std::cout << endl << "Done! Press Enter to exit..." << endl;
     getchar();
     return result;
 }
